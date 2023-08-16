@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Rustam Kovhaev&#39;s blog</title>
+    <link>https://rustylife.github.io/</link>
+    <description>Recent content on Rustam Kovhaev&#39;s blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <lastBuildDate>Tue, 15 Aug 2023 00:00:00 +0000</lastBuildDate><atom:link href="https://rustylife.github.io/rss.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Debugging a futex crash</title>
+      <link>https://rustylife.github.io/2023/08/15/futex-crash.html</link>
+      <pubDate>Tue, 15 Aug 2023 00:00:00 +0000</pubDate>
+      
+      <guid>https://rustylife.github.io/2023/08/15/futex-crash.html</guid>
+      <description>I was enjoying my quiet afternoon, when an interesting application core has been submitted to me for research.
+And what made it interesting is that I did not have to load proprietary/private symbols fort the application that crashed.
+The first thing to check is whether the file is indeed a core file, and it turns out it is not.
+rusty@nuc10:~/futex$ file veeamagent.0.crash veeamagent.0.crash: ASCII text, with very long lines (44565) rusty@nuc10:~/futex$ head veeamagent.</description>
+    </item>
+    
+  </channel>
+</rss>
