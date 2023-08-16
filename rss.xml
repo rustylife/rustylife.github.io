@@ -5,7 +5,18 @@
     <link>https://rustylife.github.io/</link>
     <description>Recent content on Rustam Kovhaev&#39;s blog</description>
     <generator>Hugo -- gohugo.io</generator>
-    <lastBuildDate>Tue, 15 Aug 2023 00:00:00 +0000</lastBuildDate><atom:link href="https://rustylife.github.io/rss.xml" rel="self" type="application/rss+xml" />
+    <language>en</language>
+    <lastBuildDate>Thu, 19 Oct 2023 00:00:00 +0000</lastBuildDate><atom:link href="https://rustylife.github.io/rss.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Debugging a kdump kernel crash</title>
+      <link>https://rustylife.github.io/2023/10/19/veeamsnap-kernel-crash.html</link>
+      <pubDate>Thu, 19 Oct 2023 00:00:00 +0000</pubDate>
+      
+      <guid>https://rustylife.github.io/2023/10/19/veeamsnap-kernel-crash.html</guid>
+      <description>Debugging a kernel bug could be a challenging task.
+Let&amp;rsquo;s say a bug lies within the memory management subsystem, slub allocator or page allocator. Depending on the debugging tools that you have chosen for troubleshooting, these tools might be calling into the mm subsystem, because they themselves need to allocate memory to show you the trace/debug output that you are interested in, and, therefore, they might be hitting the very same bug and not producing any trace/debug output at all.</description>
+    </item>
+    
     <item>
       <title>Debugging a futex crash</title>
       <link>https://rustylife.github.io/2023/08/15/futex-crash.html</link>
@@ -13,9 +24,18 @@
       
       <guid>https://rustylife.github.io/2023/08/15/futex-crash.html</guid>
       <description>I was enjoying my quiet afternoon, when an interesting application core has been submitted to me for research.
-And what made it interesting is that I did not have to load proprietary/private symbols fort the application that crashed.
+And what made it interesting is that I did not have to load proprietary/private symbols for the application that crashed.
 The first thing to check is whether the file is indeed a core file, and it turns out it is not.
 rusty@nuc10:~/futex$ file veeamagent.0.crash veeamagent.0.crash: ASCII text, with very long lines (44565) rusty@nuc10:~/futex$ head veeamagent.</description>
+    </item>
+    
+    <item>
+      <title>Linux kernel stack, PID 0 swapper processes</title>
+      <link>https://rustylife.github.io/2022/01/06/linux-kernel-stack.html</link>
+      <pubDate>Thu, 06 Jan 2022 00:00:00 +0000</pubDate>
+      
+      <guid>https://rustylife.github.io/2022/01/06/linux-kernel-stack.html</guid>
+      <description>https://www.youtube.com/watch?v=Pe8FiIVAwfY</description>
     </item>
     
   </channel>

@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Debugging a kdump kernel crash</title>
+  <link rel="alternate" type="application/rss+xml" title="RSS" href="https://rustylife.github.io/rss.xml">
+
+  <link rel="stylesheet" href="/css/main.min.71c6c5c5d13a73b3b5f0778297ce239c59b266c1fcb283b49d1b6113aa5d28d8.css">
+</head>
+
+
+<body>
+
+<h1>
+  Debugging a kdump kernel crash
+  <small>
+    <span class="date">October 19, 2023</span>
+    on
+    <span class="site"><a href="https://rustylife.github.io/">Rustam Kovhaev&#39;s blog</a></span>
+  </small>
+</h1>
+
+<main>
+  <article>
+    <p>Debugging a kernel bug could be a challenging task.</p>
+<p>Let&rsquo;s say a bug lies within the memory management subsystem, slub allocator or page allocator. <br>
+Depending on the debugging tools that you have chosen for troubleshooting, these tools might be calling into the mm subsystem, because they themselves need to allocate memory to show you the trace/debug output that you are interested in, and, therefore, they might be hitting the very same bug and not producing any trace/debug output at all.</p>
+<p>But the crash file that has been submitted to me for research, luckily, turned out to be a relatively easy one.</p>
+<p>And not a kernel bug per se, but an out-of-tree 3rd party kernel module bug.</p>
+<p>First things first, let&rsquo;s check the file&rsquo;s magic number:</p>
+<pre tabindex="0"><code>rusty@thinkpad:~$ file 202310190528/dump.202310190528
+202310190528/dump.202310190528: Flattened kdump compressed dump v6, system Linux, node debian11, release 5.10.0-26-amd64, version #1 SMP Debian 5.10.197-1 (2023-09-29), machine x86_64, domain (none)
+</code></pre><p>Now we need the debug symbols for the debian kernel 5.10.0-26-amd64.</p>
+<p>Since I am opening the kdump crash file on my Arch Linux machine, I need to manually fetch the deb package from debian repo, extract the contents, and get the vmlinux file.</p>
+<p>Now we are ready to research it, let&rsquo;s open it in the crash utility:</p>
+<pre tabindex="0"><code>rusty@thinkpad:~$ crash 202310190528/dump.202310190528 vmlinux-5.10.0-26-amd64
+...
+      KERNEL: vmlinux-5.10.0-26-amd64  [TAINTED]
+    DUMPFILE: 202310190528/dump.202310190528  [PARTIAL DUMP]
+        CPUS: 2
+        DATE: Thu Oct 19 05:28:06 PDT 2023
+      UPTIME: 04:28:07
+LOAD AVERAGE: 0.00, 0.00, 0.00
+       TASKS: 144
+    NODENAME: debian11
+     RELEASE: 5.10.0-26-amd64
+     VERSION: #1 SMP Debian 5.10.197-1 (2023-09-29)
+     MACHINE: x86_64  (2112 Mhz)
+      MEMORY: 4 GB
+       PANIC: &#34;Oops: 0010 [#1] SMP NOPTI&#34; (check log for details)
+         PID: 9462
+     COMMAND: &#34;veeamdeferio8_1&#34;
+        TASK: ffff966246d7b100  [THREAD_INFO: ffff966246d7b100]
+         CPU: 1
+       STATE: TASK_RUNNING (PANIC)
+
+crash&gt; ps -p 9462
+PID: 0        TASK: ffffffffbc613940  CPU: 0    COMMAND: &#34;swapper/0&#34;
+ PID: 2        TASK: ffff9662401eb100  CPU: 1    COMMAND: &#34;kthreadd&#34;
+  PID: 9462     TASK: ffff966246d7b100  CPU: 1    COMMAND: &#34;veeamdeferio8_1&#34;
+
+crash&gt; bt 9462
+PID: 9462     TASK: ffff966246d7b100  CPU: 1    COMMAND: &#34;veeamdeferio8_1&#34;
+ #0 [ffffafd080c7bc70] machine_kexec at ffffffffbb067ca1
+ #1 [ffffafd080c7bcc8] __crash_kexec at ffffffffbb14a52a
+ #2 [ffffafd080c7bd88] crash_kexec at ffffffffbb14b669
+ #3 [ffffafd080c7bd98] oops_end at ffffffffbb02ed3f
+ #4 [ffffafd080c7bdb8] exc_page_fault at ffffffffbb8ffb59
+ #5 [ffffafd080c7bde0] asm_exc_page_fault at ffffffffbba00b4e
+ #6 [ffffafd080c7bf10] kthread at ffffffffbb0b5b48
+ #7 [ffffafd080c7bf50] ret_from_fork at ffffffffbb00451f
+
+crash&gt; lsmod |grep -i veeam
+crash&gt;
+</code></pre><p>The kernel crashed in the context of a kernel-space process - a kthread with PID 9462 called veeamdeferio.</p>
+<p>At the moment of the crash, nothing with the name veeam was loaded into the kernel.</p>
+<p>The next step would be to review the kernel ring buffer right before the crash:</p>
+<pre tabindex="0"><code>crash&gt; log
+...
+[16086.429347] veeamsnap:tracker    | ERR | Tracker is already released for device [8:1]
+[16086.447893] veeamsnap:container  | ERR | CRITICAL ERROR: Container is not empty. cnt=2
+[16086.447901] veeamsnap:snapstore  | ERR | Cleanup snapstore devices
+[16086.460295] veeamsnap:container  | ERR | CRITICAL ERROR: Container is not empty. cnt=1
+[16086.460301] veeamsnap:snapstore  | ERR | Unable to perform snapstore cleanup: container is not empty
+[16086.529734] veeamsnap:container  | ERR | CRITICAL ERROR: Container is not empty. cnt=1
+[16086.529757] veeamsnap:ctrl_pipe  | ERR | Unable to perform ctrl pipes cleanup: container is not empty
+[16086.529967] veeamsnap:main       | ERR | container_alloc_counter=3
+[16086.529972] veeamsnap:main       container_alloc_counter=3
+[16086.529976] veeamsnap:main       | ERR | mem_cnt=65608
+[16086.529980] veeamsnap:main       mem_cnt=65608
+[16087.147849] BUG: unable to handle page fault for address: ffffffffc08a65d3
+[16087.149722] #PF: supervisor instruction fetch in kernel mode
+[16087.151349] #PF: error_code(0x0010) - not-present page
+[16087.153012] PGD 6580e067 P4D 6580e067 PUD 65810067 PMD 1047e6067 PTE 0
+[16087.154702] Oops: 0010 [#1] SMP NOPTI
+[16087.156282] CPU: 1 PID: 9462 Comm: veeamdeferio8_1 Kdump: loaded Tainted: G           OE     5.10.0-26-amd64 #1 Debian 5.10.197-1
+[16087.157927] Hardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS Arch Linux 1.16.2-2-2 04/01/2014
+[16087.159468] RIP: 0010:0xffffffffc08a65d3
+[16087.160915] Code: Unable to access opcode bytes at RIP 0xffffffffc08a65a9.
+[16087.162371] RSP: 0018:ffffafd080c7be98 EFLAGS: 00010282
+[16087.163864] RAX: 0000000000000000 RBX: ffff966242162000 RCX: 0000000000000000
+[16087.165331] RDX: 0000000000000000 RSI: 0000000000000246 RDI: 0000000000000246
+[16087.166742] RBP: 00000000000000fa R08: 0000000000000000 R09: 0000000000000000
+[16087.168145] R10: 0000000000000000 R11: 0000000000000000 R12: ffff966242162018
+[16087.169546] R13: ffffafd08410fcf0 R14: ffff966242162000 R15: ffff966246d7b100
+[16087.170909] FS:  0000000000000000(0000) GS:ffff96627bd00000(0000) knlGS:0000000000000000
+[16087.172305] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+[16087.174165] CR2: ffffffffc08a65a9 CR3: 000000010342e005 CR4: 0000000000370ee0
+[16087.175734] Call Trace:
+[16087.177402]  ? __die_body.cold+0x1a/0x1f
+[16087.178577]  ? no_context+0x1a6/0x3c0
+[16087.179462]  ? exc_page_fault+0xd9/0x160
+[16087.180338]  ? asm_exc_page_fault+0x1e/0x30
+[16087.181203]  ? add_wait_queue_exclusive+0x70/0x70
+[16087.182084]  ? kthread+0x118/0x140
+[16087.182872]  ? __kthread_bind_mask+0x60/0x60
+[16087.183491]  ? ret_from_fork+0x1f/0x30
+[16087.184105] Modules linked in: binfmt_misc dm_mod intel_rapl_msr intel_rapl_common intel_pmc_core kvm_intel kvm irqbypass ghash_clmulni_intel aesni_intel libaes crypto_simd cryptd glue_helper rapl ppdev bochs_drm drm_vram_helper drm_ttm_helper ttm joydev evdev parport_pc drm_kms_helper serio_raw pcspkr parport qemu_fw_cfg cec sg button drm configfs fuse ip_tables x_tables autofs4 ext4 crc16 mbcache jbd2 crc32c_generic sd_mod t10_pi crc_t10dif crct10dif_generic sr_mod cdrom ata_generic crct10dif_pclmul crct10dif_common ata_piix crc32_pclmul libata floppy e1000 scsi_mod crc32c_intel psmouse i2c_piix4 [last unloaded: veeamsnap]
+[16087.186898] CR2: ffffffffc08a65d3
+</code></pre><p>After carefully going over the oops message, we now have the full picture.</p>
+<p>The instruction pointer register (RIP) for the veeamdeferio kthread was pointing to 0xffffffffc08a65a9, which is an unmapped page, accessing which caused the page fault.</p>
+<p>The reason why the page got unmapped is because it has been freed when the veeamsnap kernel module was unloaded.</p>
+<p>And the problem is that veeamsnap did not stop the veeamdeferio kthread when it was being unloaded.</p>
+<p>At this point we can submit a bug report to Veeam, bug we can research the issue a bit further.</p>
+<p>Why? Because we can and it is open-source, we have the code<sup id="fnref:1"><a href="#fn:1" class="footnote-ref" role="doc-noteref">1</a></sup>.</p>
+<details>
+<summary>Flame bait</summary>
+I do not recommend anybody reading too much of an out-of-tree code, because the only code that matters is the code that has been merged upstream
+</details>
+<p>The key error message explaining the veeamsnap bug is in the output above:</p>
+<blockquote>
+<p>[16086.429347] veeamsnap:tracker    | ERR | Tracker is already released for device [8:1]</p>
+</blockquote>
+<p>This corresponds to _tracker_release_snapshot() in tracker.c, this function did not call defer_io_stop():</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-c" data-lang="c"><span class="line"><span class="cl"><span class="kt">int</span> <span class="nf">_tracker_release_snapshot</span><span class="p">(</span><span class="kt">tracker_t</span><span class="o">*</span> <span class="n">tracker</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="kt">int</span> <span class="n">result</span> <span class="o">=</span> <span class="n">SUCCESS</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="cp">#ifdef VEEAMSNAP_BLK_FREEZE
+</span></span></span><span class="line"><span class="cl"><span class="cp"></span>    <span class="k">struct</span> <span class="n">super_block</span><span class="o">*</span> <span class="n">superblock</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="cp">#endif
+</span></span></span><span class="line"><span class="cl"><span class="cp"></span>    <span class="kt">defer_io_t</span><span class="o">*</span> <span class="n">defer_io</span> <span class="o">=</span> <span class="n">tracker</span><span class="o">-&gt;</span><span class="n">defer_io</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">tracker</span><span class="o">-&gt;</span><span class="n">defer_io</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="kt">log_err_dev_t</span><span class="p">(</span><span class="s">&#34;Tracker is already released for device &#34;</span><span class="p">,</span> <span class="n">tracker</span><span class="o">-&gt;</span><span class="n">original_dev_id</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="n">SUCCESS</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">    <span class="p">...</span>
+</span></span></code></pre></div><p>And the reason for it lies within another code path, in _tracker_capture_snapshot() in the same file:</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-c" data-lang="c"><span class="line"><span class="cl"><span class="kt">int</span> <span class="nf">_tracker_capture_snapshot</span><span class="p">(</span><span class="kt">tracker_t</span><span class="o">*</span> <span class="n">tracker</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="kt">int</span> <span class="n">result</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="kt">defer_io_t</span><span class="o">*</span> <span class="n">defer_io</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="n">result</span> <span class="o">=</span> <span class="nf">defer_io_create</span><span class="p">(</span><span class="n">tracker</span><span class="o">-&gt;</span><span class="n">original_dev_id</span><span class="p">,</span> <span class="n">tracker</span><span class="o">-&gt;</span><span class="n">target_dev</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">defer_io</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="p">(</span><span class="n">result</span> <span class="o">!=</span> <span class="n">SUCCESS</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="nf">log_err</span><span class="p">(</span><span class="s">&#34;Failed to create defer IO processor&#34;</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="n">result</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="n">tracker</span><span class="o">-&gt;</span><span class="n">defer_io</span> <span class="o">=</span> <span class="nf">defer_io_get_resource</span><span class="p">(</span><span class="n">defer_io</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">    <span class="p">...</span>
+</span></span></code></pre></div><p>Here, on the last line, tracker-&gt;defer_io pointer gets assigned a new value.</p>
+<p>This assignment overwrites and leaks the existing non-null pointer.</p>
+<p>And this unaccounted-for veeamdeferio kthread never gets stopped, and, subsequently, causes the kernel to crash later on during module removal.</p>
+<p>And now we are good to submit this RCA to Veeam for fixing.</p>
+<div class="footnotes" role="doc-endnotes">
+<hr>
+<ol>
+<li id="fn:1">
+<p><a href="https://github.com/veeam/veeamsnap">https://github.com/veeam/veeamsnap</a>&#160;<a href="#fnref:1" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+</ol>
+</div>
+
+  </article>
+</main>
+
+</body>
+
+<footer>
+</footer>
+
+
+</html>

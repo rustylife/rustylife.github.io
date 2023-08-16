@@ -1,15 +1,18 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  
+
   <title>Debugging a futex crash</title>
   <link rel="alternate" type="application/rss+xml" title="RSS" href="https://rustylife.github.io/rss.xml">
-  
-  <link rel="stylesheet" href="/main.min.fbee2ede33c02698d508178167c7556879b09625f70dfe0d8fa551c74788392f.css">
+
+  <link rel="stylesheet" href="/css/main.min.71c6c5c5d13a73b3b5f0778297ce239c59b266c1fcb283b49d1b6113aa5d28d8.css">
 </head>
 
+
+<body>
 
 <h1>
   Debugging a futex crash
@@ -23,7 +26,7 @@
 <main>
   <article>
     <p>I was enjoying my quiet afternoon, when an interesting application core has been submitted to me for research.</p>
-<p>And what made it interesting is that I did not have to load proprietary/private symbols fort the application that crashed.</p>
+<p>And what made it interesting is that I did not have to load proprietary/private symbols for the application that crashed.</p>
 <p>The first thing to check is whether the file is indeed a core file, and it turns out it is not.</p>
 <pre tabindex="0"><code>rusty@nuc10:~/futex$ file veeamagent.0.crash 
 veeamagent.0.crash: ASCII text, with very long lines (44565)
@@ -105,22 +108,22 @@ From                To                  Syms Read   Shared Object Library
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-c" data-lang="c"><span class="line"><span class="cl"><span class="kt">void</span>
 </span></span><span class="line"><span class="cl"><span class="nf">__lll_lock_wait</span> <span class="p">(</span><span class="kt">int</span> <span class="o">*</span><span class="n">futex</span><span class="p">,</span> <span class="kt">int</span> <span class="n">private</span><span class="p">)</span>
 </span></span><span class="line"><span class="cl"><span class="p">{</span>
-</span></span><span class="line"><span class="cl">  <span class="k">if</span> <span class="p">(</span><span class="n">atomic_load_relaxed</span> <span class="p">(</span><span class="n">futex</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="k">if</span> <span class="p">(</span><span class="nf">atomic_load_relaxed</span> <span class="p">(</span><span class="n">futex</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">)</span>
 </span></span><span class="line"><span class="cl">    <span class="k">goto</span> <span class="n">futex</span><span class="p">;</span>
 </span></span><span class="line"><span class="cl">
-</span></span><span class="line"><span class="cl">  <span class="k">while</span> <span class="p">(</span><span class="n">atomic_exchange_acquire</span> <span class="p">(</span><span class="n">futex</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">  <span class="k">while</span> <span class="p">(</span><span class="nf">atomic_exchange_acquire</span> <span class="p">(</span><span class="n">futex</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span>
 </span></span><span class="line"><span class="cl">    <span class="p">{</span>
 </span></span><span class="line"><span class="cl">    <span class="nl">futex</span><span class="p">:</span>
-</span></span><span class="line"><span class="cl">      <span class="n">LIBC_PROBE</span> <span class="p">(</span><span class="n">lll_lock_wait</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">futex</span><span class="p">);</span>
-</span></span><span class="line"><span class="cl">      <span class="n">futex_wait</span> <span class="p">((</span><span class="kt">unsigned</span> <span class="kt">int</span> <span class="o">*</span><span class="p">)</span> <span class="n">futex</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">private</span><span class="p">);</span> <span class="cm">/* Wait if *futex == 2.  */</span>
+</span></span><span class="line"><span class="cl">      <span class="nf">LIBC_PROBE</span> <span class="p">(</span><span class="n">lll_lock_wait</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">futex</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">      <span class="nf">futex_wait</span> <span class="p">((</span><span class="kt">unsigned</span> <span class="kt">int</span> <span class="o">*</span><span class="p">)</span> <span class="n">futex</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">private</span><span class="p">);</span> <span class="cm">/* Wait if *futex == 2.  */</span>
 </span></span><span class="line"><span class="cl">    <span class="p">}</span>
 </span></span><span class="line"><span class="cl"><span class="p">}</span>
-</span></span><span class="line"><span class="cl"><span class="n">libc_hidden_def</span> <span class="p">(</span><span class="n">__lll_lock_wait</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="nf">libc_hidden_def</span> <span class="p">(</span><span class="n">__lll_lock_wait</span><span class="p">)</span>
 </span></span></code></pre></div><p>futex_wait() is always inlined, that is why it is not in the stack, and futex_wait() calls futex_fatal_error(), which subsequently calls abort()</p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-c" data-lang="c"><span class="line"><span class="cl"><span class="k">static</span> <span class="n">__always_inline</span> <span class="kt">int</span>
 </span></span><span class="line"><span class="cl"><span class="nf">futex_wait</span> <span class="p">(</span><span class="kt">unsigned</span> <span class="kt">int</span> <span class="o">*</span><span class="n">futex_word</span><span class="p">,</span> <span class="kt">unsigned</span> <span class="kt">int</span> <span class="n">expected</span><span class="p">,</span> <span class="kt">int</span> <span class="n">private</span><span class="p">)</span>
 </span></span><span class="line"><span class="cl"><span class="p">{</span>
-</span></span><span class="line"><span class="cl">  <span class="kt">int</span> <span class="n">err</span> <span class="o">=</span> <span class="n">lll_futex_timed_wait</span> <span class="p">(</span><span class="n">futex_word</span><span class="p">,</span> <span class="n">expected</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="n">private</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">  <span class="kt">int</span> <span class="n">err</span> <span class="o">=</span> <span class="nf">lll_futex_timed_wait</span> <span class="p">(</span><span class="n">futex_word</span><span class="p">,</span> <span class="n">expected</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="n">private</span><span class="p">);</span>
 </span></span><span class="line"><span class="cl">  <span class="k">switch</span> <span class="p">(</span><span class="n">err</span><span class="p">)</span>
 </span></span><span class="line"><span class="cl">    <span class="p">{</span>
 </span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="mi">0</span><span class="o">:</span>
@@ -136,7 +139,7 @@ From                To                  Syms Read   Shared Object Library
 </span></span><span class="line"><span class="cl">    <span class="k">case</span> <span class="o">-</span><span class="nl">ENOSYS</span><span class="p">:</span> <span class="cm">/* Must have been caused by a glibc bug.  */</span>
 </span></span><span class="line"><span class="cl">    <span class="cm">/* No other errors are documented at this time.  */</span>
 </span></span><span class="line"><span class="cl">    <span class="k">default</span><span class="o">:</span>
-</span></span><span class="line"><span class="cl">      <span class="n">futex_fatal_error</span> <span class="p">();</span>
+</span></span><span class="line"><span class="cl">      <span class="nf">futex_fatal_error</span> <span class="p">();</span>
 </span></span><span class="line"><span class="cl">    <span class="p">}</span>
 </span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span></code></pre></div><p>After reading the comments, let&rsquo;s check the easiest thing first, wrong alignment.</p>
@@ -162,14 +165,14 @@ From                To                  Syms Read   Shared Object Library
 </span></span></span><span class="line"><span class="cl"><span class="cp">#include</span> <span class="cpf">&lt;unistd.h&gt;</span><span class="cp">
 </span></span></span><span class="line"><span class="cl"><span class="cp">#include</span> <span class="cpf">&lt;pthread.h&gt;</span><span class="cp">
 </span></span></span><span class="line"><span class="cl"><span class="cp"></span>
-</span></span><span class="line"><span class="cl"><span class="n">pthread_mutex_t</span> <span class="n">mutex</span> <span class="nf">__attribute__</span><span class="p">((</span><span class="n">section</span><span class="p">(</span><span class="s">&#34;.reproducer&#34;</span><span class="p">)))</span> <span class="n">__attribute__</span> <span class="p">((</span><span class="n">aligned</span><span class="p">(</span><span class="mi">1</span><span class="p">)));</span>
+</span></span><span class="line"><span class="cl"><span class="kt">pthread_mutex_t</span> <span class="n">mutex</span> <span class="nf">__attribute__</span><span class="p">((</span><span class="nf">section</span><span class="p">(</span><span class="s">&#34;.reproducer&#34;</span><span class="p">)))</span> <span class="nf">__attribute__</span> <span class="p">((</span><span class="nf">aligned</span><span class="p">(</span><span class="mi">1</span><span class="p">)));</span>
 </span></span><span class="line"><span class="cl">
 </span></span><span class="line"><span class="cl"><span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="kt">char</span> <span class="o">**</span><span class="n">argv</span><span class="p">)</span>
 </span></span><span class="line"><span class="cl"><span class="p">{</span>
-</span></span><span class="line"><span class="cl">	<span class="n">printf</span><span class="p">(</span><span class="s">&#34;mutex %p</span><span class="se">\n</span><span class="s">&#34;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">mutex</span><span class="p">);</span>
-</span></span><span class="line"><span class="cl">	<span class="n">pthread_mutex_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mutex</span><span class="p">);</span>
-</span></span><span class="line"><span class="cl">	<span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
-</span></span><span class="line"><span class="cl">	<span class="n">pthread_mutex_unlock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mutex</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">	<span class="nf">printf</span><span class="p">(</span><span class="s">&#34;mutex %p</span><span class="se">\n</span><span class="s">&#34;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">mutex</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">	<span class="nf">pthread_mutex_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mutex</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">	<span class="nf">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">	<span class="nf">pthread_mutex_unlock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mutex</span><span class="p">);</span>
 </span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
 </span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span></code></pre></div><p>Now, let&rsquo;s compile it and test it, it should crash with the same stack trace as we have in our core.</p>
@@ -201,13 +204,13 @@ rusty@nuc10:~/futex$
 </span></span></span><span class="line"><span class="cl"><span class="cp">#include</span> <span class="cpf">&lt;unistd.h&gt;</span><span class="cp">
 </span></span></span><span class="line"><span class="cl"><span class="cp">#include</span> <span class="cpf">&lt;pthread.h&gt;</span><span class="cp">
 </span></span></span><span class="line"><span class="cl"><span class="cp"></span>
-</span></span><span class="line"><span class="cl"><span class="n">pthread_mutex_t</span> <span class="n">mutex</span> <span class="nf">__attribute__</span><span class="p">((</span><span class="n">section</span><span class="p">(</span><span class="s">&#34;.reproducer&#34;</span><span class="p">)))</span> <span class="n">__attribute__</span> <span class="p">((</span><span class="n">aligned</span><span class="p">(</span><span class="mi">1</span><span class="p">)));</span>
+</span></span><span class="line"><span class="cl"><span class="kt">pthread_mutex_t</span> <span class="n">mutex</span> <span class="nf">__attribute__</span><span class="p">((</span><span class="nf">section</span><span class="p">(</span><span class="s">&#34;.reproducer&#34;</span><span class="p">)))</span> <span class="nf">__attribute__</span> <span class="p">((</span><span class="nf">aligned</span><span class="p">(</span><span class="mi">1</span><span class="p">)));</span>
 </span></span><span class="line"><span class="cl">
 </span></span><span class="line"><span class="cl"><span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="kt">char</span> <span class="o">**</span><span class="n">argv</span><span class="p">)</span>
 </span></span><span class="line"><span class="cl"><span class="p">{</span>
-</span></span><span class="line"><span class="cl">	<span class="n">printf</span><span class="p">(</span><span class="s">&#34;mutex %p</span><span class="se">\n</span><span class="s">&#34;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">mutex</span><span class="p">);</span>
-</span></span><span class="line"><span class="cl">	<span class="n">pthread_mutex_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mutex</span><span class="p">);</span>
-</span></span><span class="line"><span class="cl">	<span class="n">pthread_mutex_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mutex</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">	<span class="nf">printf</span><span class="p">(</span><span class="s">&#34;mutex %p</span><span class="se">\n</span><span class="s">&#34;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">mutex</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">	<span class="nf">pthread_mutex_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mutex</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">	<span class="nf">pthread_mutex_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mutex</span><span class="p">);</span>
 </span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span></code></pre></div><p>Let&rsquo;s run this:</p>
 <pre tabindex="0"><code>rusty@nuc10:~/futex$ gcc -g futex0.c -lpthread  -Wl,--section-start=.reproducer=0x8001ea1
@@ -249,7 +252,7 @@ rusty@nuc10:~/futex$ sudo trace-cmd report
 </span></span></span><span class="line"><span class="cl"><span class="cm">          * The futex address must be &#34;naturally&#34; aligned.
 </span></span></span><span class="line"><span class="cl"><span class="cm">          */</span>
 </span></span><span class="line"><span class="cl">         <span class="n">key</span><span class="o">-&gt;</span><span class="n">both</span><span class="p">.</span><span class="n">offset</span> <span class="o">=</span> <span class="n">address</span> <span class="o">%</span> <span class="n">PAGE_SIZE</span><span class="p">;</span>
-</span></span><span class="line"><span class="cl">         <span class="k">if</span> <span class="p">(</span><span class="n">unlikely</span><span class="p">((</span><span class="n">address</span> <span class="o">%</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">u32</span><span class="p">))</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">         <span class="k">if</span> <span class="p">(</span><span class="nf">unlikely</span><span class="p">((</span><span class="n">address</span> <span class="o">%</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">u32</span><span class="p">))</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">))</span>
 </span></span><span class="line"><span class="cl">                  <span class="k">return</span> <span class="o">-</span><span class="n">EINVAL</span><span class="p">;</span>
 </span></span></code></pre></div><p>And there we have it again, the futex address must be aligned.</p>
 <p>And with that, we can conclude our research and send this bug report to Veeam for fixing.</p>
@@ -258,6 +261,10 @@ rusty@nuc10:~/futex$ sudo trace-cmd report
   </article>
 </main>
 
+</body>
+
 <footer>
 </footer>
 
+
+</html>
